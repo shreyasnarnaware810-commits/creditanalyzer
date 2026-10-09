@@ -1,0 +1,12 @@
+{
+  "model_version": "credence_gb_v1",
+  "synthetic_test_auc": 0.9969,
+  "synthetic_test_brier": 0.0046,
+  "synthetic_test_accuracy": 0.995,
+  "synthetic_test_precision": 0.8,
+  "synthetic_test_recall": 0.7273,
+  "n_samples": 5000,
+  "n_train": 4000,
+  "n_test": 1000,
+  "target": "synthetic_default"
+}
