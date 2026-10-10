@@ -1,0 +1,27 @@
+
+# Python virtual environments
+**/venv/
+**/.venv/
+
+# Python cache and test output
+**/__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Frontend dependencies and generated build
+**/node_modules/
+**/dist/
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+
+# Local database files
+*.db
+*.sqlite
+*.sqlite3
+
+# OS files
+.DS_Store
+Thumbs.db

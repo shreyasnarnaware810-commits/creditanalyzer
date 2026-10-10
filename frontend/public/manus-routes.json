@@ -1,0 +1,13 @@
+{
+  "routes": [
+    { "path": "/", "title": "Credence AI" },
+    { "path": "/login", "title": "Login" },
+    { "path": "/overview", "title": "Overview" },
+    { "path": "/new-analysis", "title": "New Analysis" },
+    { "path": "/applications", "title": "Applications" },
+    { "path": "/applications/:id", "title": "Application Detail" },
+    { "path": "/decision-history", "title": "Decision History" },
+    { "path": "/fairness-model", "title": "Fairness Model" },
+    { "path": "/settings", "title": "Settings" }
+  ]
+}
