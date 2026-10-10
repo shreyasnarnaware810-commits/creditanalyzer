@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { ShieldCheck, AlertCircle } from "lucide-react";
+import loginBackground from "../assets/login-background.avif";
 
 export const LoginPage: React.FC = () => {
   const { login, signup } = useAuth();
@@ -32,20 +33,28 @@ export const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#F5F7FA] flex flex-col justify-center items-center px-4 py-12">
-      <div className="max-w-md w-full space-y-8">
+    <div
+      className="relative min-h-screen bg-[#14243A] flex flex-col justify-center items-center px-4 py-12 overflow-hidden"
+      style={{
+        backgroundImage: `url(${loginBackground})`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+      }}
+    >
+      <div className="absolute inset-0 bg-[#14243A]/70" aria-hidden="true" />
+      <div className="relative z-10 max-w-md w-full space-y-8">
         <div className="text-center space-y-3">
           <div className="w-14 h-14 rounded-xl bg-[#0D9488] mx-auto flex items-center justify-center shadow-md">
             <ShieldCheck className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-2xl font-black text-[#14243A] tracking-tight">CREDENCE <span className="text-[#0D9488]">AI</span></h1>
-          <p className="text-xs text-slate-500 max-w-xs mx-auto">
+          <h1 className="text-2xl font-black text-white tracking-tight">CREDENCE <span className="text-[#5EEAD4]">AI</span></h1>
+          <p className="text-xs text-white/80 max-w-xs mx-auto">
             Explainable Alternative Credit Scoring & Informal Income Synthesizer
           </p>
         </div>
 
         {/* Login Form Card */}
-        <div className="bg-white border border-slate-200 p-8 rounded-2xl shadow-card space-y-6">
+        <div className="bg-white/95 backdrop-blur-sm border border-white/60 p-8 rounded-2xl shadow-card space-y-6">
           <div className="flex border-b border-slate-200 pb-3">
             <button
               onClick={() => { setIsSignup(false); setError(null); }}
@@ -145,7 +154,7 @@ export const LoginPage: React.FC = () => {
           </form>
         </div>
 
-        <p className="text-center text-[11px] text-slate-400 font-medium">
+        <p className="text-center text-[11px] text-white/75 font-medium">
           Credence AI — Secure Underwriting Portal
         </p>
       </div>
