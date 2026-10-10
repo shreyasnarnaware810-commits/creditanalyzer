@@ -12,6 +12,7 @@ import { DecisionHistoryPage } from "./pages/DecisionHistoryPage";
 import { FairnessModelPage } from "./pages/FairnessModelPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import siteBackground from "./assets/site-background.jpg";
+import { LandingPage } from "./pages/LandingPage";
 
 const ProtectedLayout: React.FC = () => {
   const { user, loading } = useAuth();
@@ -66,6 +67,7 @@ export const AppContent: React.FC = () => {
   const { user } = useAuth();
   return (
     <Routes>
+      <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={user ? <Navigate to="/overview" replace /> : <LoginPage />} />
       <Route path="/*" element={<ProtectedLayout />} />
     </Routes>
