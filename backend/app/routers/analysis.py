@@ -6,14 +6,90 @@ from app.models.schema import AnalysisRunResponse, WhatIfRequest, WhatIfResponse
 from app.auth.security import get_current_user
 from app.database import get_db
 from app.services.data_ingestion import parse_transaction_csv, parse_utility_csv
+from app.services.pdf_converter import parse_pdf_bank_statement
+from app.services.pdf_report_generator import generate_credit_assessment_pdf
 from app.services.cashflow_synthesizer import compute_cashflow_features
 from app.services.fraud_heuristics import evaluate_fraud_heuristics
 from app.services.ml_engine import ml_engine, MODEL_VERSION
 from app.services.shap_explainer import shap_explainer
 from app.services.loan_policy import evaluate_loan_policy
 from app.services.whatif_simulator import simulate_whatif_scenario
+from fastapi.responses import Response
 
 router = APIRouter(prefix="/api/analysis", tags=["Analysis"])
+
+@router.post("/preview-pdf")
+async def preview_pdf_transactions(
+    pdf_file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Extracts transactions from an uploaded bank statement PDF, returns normalized preview records,
+    and formats them into the standard 2-column CSV dataset (transaction_date,amount).
+    """
+    if not (pdf_file.filename or "").lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Uploaded file is not a valid PDF document.")
+
+    content = await pdf_file.read()
+    res = parse_pdf_bank_statement(content, pdf_file.filename)
+
+    if res["status"] == "invalid":
+        raise HTTPException(status_code=400, detail=res["error_message"])
+
+    df = res["dataframe"]
+    csv_lines = ["transaction_date,amount"]
+    transactions = []
+
+    valid_count = 0
+    review_count = 0
+    invalid_count = 0
+
+    for idx, row in df.iterrows():
+        d_str = row["transaction_date"].strftime("%Y-%m-%d")
+        amt = float(row["amount"])
+        tx_type = str(row.get("transaction_type", "debit")).lower()
+        signed_amt = amt if tx_type == "credit" else -amt
+
+        csv_lines.append(f"{d_str},{signed_amt:.2f}")
+
+        row_status = "valid"
+        if amt <= 0 or not d_str:
+            row_status = "invalid"
+            invalid_count += 1
+        elif abs(signed_amt) >= 75000:
+            row_status = "review"
+            review_count += 1
+        else:
+            valid_count += 1
+
+        transactions.append({
+            "id": int(idx + 1),
+            "transaction_date": d_str,
+            "description": str(row.get("description", "Transaction")),
+            "transaction_type": tx_type,
+            "raw_amount": amt,
+            "signed_amount": signed_amt,
+            "counterparty": str(row.get("counterparty", "N/A")),
+            "transaction_id": str(row.get("transaction_id", "") or "N/A"),
+            "status": row_status
+        })
+
+    csv_content = "\n".join(csv_lines)
+
+    return {
+        "status": "success",
+        "filename": pdf_file.filename,
+        "row_count": len(transactions),
+        "valid_count": valid_count,
+        "review_count": review_count,
+        "invalid_count": invalid_count,
+        "coverage_months": res.get("coverage_months", 1.0),
+        "date_start": res.get("date_start", ""),
+        "date_end": res.get("date_end", ""),
+        "warnings": res.get("warnings", []),
+        "transactions": transactions,
+        "csv_content": csv_content
+    }
 
 @router.post("", response_model=AnalysisRunResponse)
 async def run_analysis(
@@ -33,11 +109,18 @@ async def run_analysis(
         if current_user["role"] == "borrower" and app_dict["borrower_id"] != current_user["id"]:
             raise HTTPException(status_code=403, detail="Permission denied: Cannot submit analysis for another borrower's record")
 
-    # Read transaction file content
+    # Read transaction file content (Supports CSV and PDF bank statements)
     tx_content = await transactions_file.read()
-    tx_res = parse_transaction_csv(tx_content, transactions_file.filename)
+    filename_lower = (transactions_file.filename or "").lower()
+
+    if filename_lower.endswith(".pdf"):
+        tx_res = parse_pdf_bank_statement(tx_content, transactions_file.filename)
+    else:
+        tx_res = parse_transaction_csv(tx_content, transactions_file.filename)
+
     if tx_res["status"] == "invalid":
         raise HTTPException(status_code=400, detail=tx_res["error_message"])
+
         
     punctuality_rate = 0.85
     utility_file_id = None
@@ -275,3 +358,40 @@ def run_whatif(req: WhatIfRequest, current_user: dict = Depends(get_current_user
         overrides=overrides
     )
     return res
+
+@router.get("/{run_id}/report")
+def download_assessment_report(run_id: str, current_user: dict = Depends(get_current_user)):
+    """
+    Generates and returns a downloadable PDF Credit Assessment & SHAP Explanation Report.
+    """
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT ar.output_metadata, u.full_name as borrower_name, app.id as app_id
+            FROM analysis_runs ar
+            JOIN applications app ON ar.application_id = app.id
+            JOIN users u ON app.borrower_id = u.id
+            WHERE ar.id = ?
+        """, (run_id,))
+        row = cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Analysis run not found")
+
+        ar_data = json.loads(row["output_metadata"])
+        borrower_name = row["borrower_name"]
+        app_id = row["app_id"]
+
+    try:
+        pdf_bytes = generate_credit_assessment_pdf(
+            analysis_data=ar_data,
+            borrower_name=borrower_name,
+            application_id=app_id
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate PDF assessment report: {str(e)}")
+
+    headers = {
+        "Content-Disposition": f'attachment; filename="Credence_AI_Assessment_{app_id}.pdf"'
+    }
+    return Response(content=pdf_bytes, media_type="application/pdf", headers=headers)
+

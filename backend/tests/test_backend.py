@@ -146,3 +146,85 @@ def test_whatif_scenario_recalculation(client):
     assert "hypothetical_score" in res_data
     assert "changed_inputs" in res_data
     assert "stable_monthly_cash_flow" in res_data["changed_inputs"]
+
+def test_download_assessment_report(client):
+    login_res = client.post("/api/auth/login", json={"username": "officer_demo", "password": "password123"})
+    token = login_res.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+    
+    seed_res = client.post("/api/demo/seed").json()
+    run_id = seed_res["analysis_run_id"]
+
+    report_res = client.get(f"/api/analysis/{run_id}/report", headers=headers)
+    assert report_res.status_code == 200
+    assert report_res.headers["content-type"] == "application/pdf"
+    assert len(report_res.content) > 1000
+    assert report_res.content.startswith(b"%PDF")
+
+
+def test_pdf_gpay_statement_parsing_and_reconciliation():
+    import os
+    pdf_path = r"C:\Users\shash\Downloads\gpay_statement_20260401_20260930.pdf"
+    if not os.path.exists(pdf_path):
+        return
+
+    from app.services.pdf_converter import parse_pdf_bank_statement
+
+    with open(pdf_path, "rb") as f:
+        content = f.read()
+
+    res = parse_pdf_bank_statement(content, "gpay_statement.pdf")
+    assert res["status"] == "valid"
+    assert res["row_count"] == 46
+    assert res["extracted_summary"]["total_credits"] == 47005.0
+    assert res["extracted_summary"]["total_debits"] == 90101.0
+    df = res["dataframe"]
+    assert "counterparty" in df.columns
+    assert "transaction_id" in df.columns
+
+
+def test_scanned_or_unsupported_pdf_error_handling():
+    from app.services.pdf_converter import parse_pdf_bank_statement
+    
+    # 1. Invalid/empty PDF test
+    fake_empty_pdf = b"%PDF-1.4 empty pdf text layer demo"
+    res_empty = parse_pdf_bank_statement(fake_empty_pdf, "scanned.pdf")
+    assert res_empty["status"] == "invalid"
+    assert "failed to read" in res_empty["error_message"].lower() or "scanned" in res_empty["error_message"].lower() or "no text" in res_empty["error_message"].lower()
+
+
+def test_preview_pdf_endpoint(client):
+    import os
+    pdf_path = r"C:\Users\shash\Downloads\gpay_statement_20260401_20260930.pdf"
+    if not os.path.exists(pdf_path):
+        return
+
+    login_res = client.post("/api/auth/login", json={"username": "officer_demo", "password": "password123"})
+    token = login_res.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    with open(pdf_path, "rb") as f:
+        files = {"pdf_file": ("gpay_statement.pdf", f, "application/pdf")}
+        res = client.post("/api/analysis/preview-pdf", headers=headers, files=files)
+
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "success"
+    assert data["row_count"] == 46
+    assert "csv_content" in data
+    assert data["csv_content"].startswith("transaction_date,amount")
+
+
+def test_non_utf8_csv_ingestion():
+    from app.services.data_ingestion import parse_transaction_csv
+
+    # CSV byte stream containing non-UTF8 byte 0x9c (e.g. CP1252 character)
+    bad_utf8_csv = b"transaction_date,amount\n2025-08-01,2450.00\n2025-08-03,\x9c650.00\n"
+    res = parse_transaction_csv(bad_utf8_csv, "non_utf8_test.csv")
+    assert res["status"] in ["valid", "warning"]
+    assert res["row_count"] == 2
+
+
+
+
+

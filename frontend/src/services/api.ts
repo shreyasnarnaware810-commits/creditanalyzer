@@ -82,6 +82,31 @@ export const api = {
   },
 
   // Analysis & Pipeline
+  async previewPdf(pdfFile: File) {
+    const formData = new FormData();
+    formData.append("pdf_file", pdfFile);
+
+    const token = localStorage.getItem("credence_token");
+    const response = await fetch(`${API_BASE_URL}/api/analysis/preview-pdf`, {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: formData,
+    });
+
+    if (!response.ok) {
+      let errorMsg = "Failed to extract PDF bank statement";
+      try {
+        const errData = await response.json();
+        errorMsg = errData.detail || errData.message || JSON.stringify(errData);
+      } catch {
+        errorMsg = `Server error ${response.status}: ${response.statusText}`;
+      }
+      throw new Error(errorMsg);
+    }
+
+    return response.json();
+  },
+
   async runAnalysis(applicationId: string, transactionsFile: File, utilityFile?: File) {
     const formData = new FormData();
     formData.append("application_id", applicationId);
@@ -152,5 +177,28 @@ export const api = {
 
   getSampleCsvUrl(filename: string) {
     return `${API_BASE_URL}/api/demo/sample-csv/${filename}`;
+  },
+
+  // PDF Report Download
+  async downloadReport(runId: string, filename: string = "Credence_AI_Assessment.pdf") {
+    const token = localStorage.getItem("credence_token");
+    const response = await fetch(`${API_BASE_URL}/api/analysis/${runId}/report`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to download PDF report");
+    }
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
   }
 };
+

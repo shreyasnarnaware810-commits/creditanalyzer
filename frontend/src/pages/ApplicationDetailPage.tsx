@@ -17,7 +17,8 @@ import {
   CheckCircle2,
   XCircle,
   Info,
-  Lock
+  Lock,
+  Download
 } from "lucide-react";
 
 export const ApplicationDetailPage: React.FC = () => {
@@ -45,6 +46,7 @@ export const ApplicationDetailPage: React.FC = () => {
   const [decisionSubmitting, setDecisionSubmitting] = useState(false);
   const [decisionError, setDecisionError] = useState<string | null>(null);
   const [decisionSuccess, setDecisionSuccess] = useState<string | null>(null);
+  const [downloadingReport, setDownloadingReport] = useState(false);
 
   const loadAllData = async () => {
     if (!id) return;
@@ -76,6 +78,19 @@ export const ApplicationDetailPage: React.FC = () => {
   useEffect(() => {
     loadAllData();
   }, [id]);
+
+  const handleDownloadReport = async () => {
+    if (!app?.latest_analysis_run_id) return;
+    setDownloadingReport(true);
+    try {
+      await api.downloadReport(app.latest_analysis_run_id, `Credence_AI_Assessment_${app.id}.pdf`);
+    } catch (err: any) {
+      console.error(err);
+      alert("Failed to download PDF assessment report.");
+    } finally {
+      setDownloadingReport(false);
+    }
+  };
 
   const handleRunWhatIf = async () => {
     if (!analysisRun) return;
@@ -156,15 +171,27 @@ export const ApplicationDetailPage: React.FC = () => {
           </div>
         </div>
 
-        {analysisRun && (
-          <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          {app.latest_analysis_run_id && (
+            <button
+              onClick={handleDownloadReport}
+              disabled={downloadingReport}
+              className="px-3.5 py-2 rounded-lg bg-[#0D9488] hover:bg-[#0F766E] text-white text-xs font-bold shadow-xs flex items-center gap-1.5 transition-all disabled:opacity-50 cursor-pointer"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>{downloadingReport ? "Generating PDF..." : "Download Assessment Report"}</span>
+            </button>
+          )}
+
+          {analysisRun && (
             <DataQualityBadge
               level={analysisRun.data.data_confidence}
               warnings={analysisRun.data.warnings}
             />
-          </div>
-        )}
+          )}
+        </div>
       </div>
+
 
       {/* Navigation Tabs */}
       <div className="flex border-b border-slate-200 space-x-2 overflow-x-auto bg-white px-4 pt-2 rounded-t-xl border">
@@ -307,6 +334,42 @@ export const ApplicationDetailPage: React.FC = () => {
                 <div className="text-xl font-extrabold text-[#0D9488]">₹{analysisRun.loan_policy.recommended_amount?.toLocaleString()}</div>
               </div>
             </div>
+
+            {/* Affordability Analysis Grid */}
+            {analysisRun.loan_policy.affordability && (
+              <div className="bg-slate-50/80 border border-slate-200 p-4 rounded-xl space-y-3">
+                <div className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                  Debt Affordability & DSCR Analysis
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                  <div className="bg-white p-3 rounded-lg border border-slate-200">
+                    <span className="text-slate-500 font-medium">Est. Monthly EMI</span>
+                    <div className="font-bold text-slate-900 text-sm">₹{analysisRun.loan_policy.affordability.estimated_emi_monthly?.toLocaleString()}</div>
+                    <div className="text-[10px] text-slate-400">12m @ 14% p.a.</div>
+                  </div>
+
+                  <div className="bg-white p-3 rounded-lg border border-slate-200">
+                    <span className="text-slate-500 font-medium">DSCR Ratio</span>
+                    <div className="font-bold text-emerald-700 text-sm">{analysisRun.loan_policy.affordability.dscr}x</div>
+                    <div className="text-[10px] text-slate-400">Target &ge; 1.25x</div>
+                  </div>
+
+                  <div className="bg-white p-3 rounded-lg border border-slate-200">
+                    <span className="text-slate-500 font-medium">Cash Flow Ratio</span>
+                    <div className="font-bold text-slate-900 text-sm">{analysisRun.loan_policy.affordability.affordability_ratio_pct}%</div>
+                    <div className="text-[10px] text-slate-400">EMI / Net Cash Flow</div>
+                  </div>
+
+                  <div className="bg-white p-3 rounded-lg border border-slate-200">
+                    <span className="text-slate-500 font-medium">Max Affordable EMI</span>
+                    <div className="font-bold text-slate-900 text-sm">₹{analysisRun.loan_policy.affordability.max_affordable_emi_monthly?.toLocaleString()}</div>
+                    <div className="text-[10px] text-slate-400">50% Net Cash Flow Cap</div>
+                  </div>
+                </div>
+              </div>
+            )}
+
 
             <div className="bg-teal-50 border border-teal-200 p-4 rounded-xl text-xs text-teal-950 space-y-1">
               <div className="font-bold text-[#0D9488] flex items-center gap-1.5">

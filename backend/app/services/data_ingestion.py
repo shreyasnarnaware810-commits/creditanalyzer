@@ -8,11 +8,27 @@ from typing import Dict, Any, List, Tuple
 REQUIRED_TRANSACTION_COLS = ["transaction_date", "amount"]
 REQUIRED_UTILITY_COLS = ["billing_period", "payment_status"]
 
+def _load_csv_dataframe(file_content: bytes) -> pd.DataFrame:
+    """
+    Robustly loads a CSV byte stream using multiple encoding fallbacks (utf-8, utf-8-sig, cp1252, latin1, iso-8859-1).
+    Prevents UnicodeDecodeError on non-UTF8 characters (e.g. 0x9c, currency symbols, Windows Excel exports).
+    """
+    encodings_to_try = ["utf-8", "utf-8-sig", "cp1252", "latin1", "iso-8859-1"]
+    for enc in encodings_to_try:
+        try:
+            return pd.read_csv(io.BytesIO(file_content), encoding=enc)
+        except (UnicodeDecodeError, UnicodeError):
+            continue
+    
+    # Final safety net decode with replacement
+    text = file_content.decode("utf-8", errors="replace")
+    return pd.read_csv(io.StringIO(text))
+
 def parse_transaction_csv(file_content: bytes, filename: str) -> Dict[str, Any]:
     checksum = hashlib.sha256(file_content).hexdigest()
     
     try:
-        df = pd.read_csv(io.BytesIO(file_content))
+        df = _load_csv_dataframe(file_content)
     except Exception as e:
         return {
             "status": "invalid",
@@ -33,6 +49,11 @@ def parse_transaction_csv(file_content: bytes, filename: str) -> Dict[str, Any]:
             "filename": filename
         }
         
+    # Clean numeric amount values (strip currency symbols or non-numeric tokens)
+    if "amount" in df.columns:
+        df["amount"] = df["amount"].astype(str).str.replace(r'[^\d.-]', '', regex=True)
+        df["amount"] = pd.to_numeric(df["amount"], errors="coerce")
+
     # Check for canonical columns or fill defaults
     if "transaction_type" not in df.columns:
         # Infer type from sign of amount if available
@@ -105,7 +126,7 @@ def parse_transaction_csv(file_content: bytes, filename: str) -> Dict[str, Any]:
 def parse_utility_csv(file_content: bytes, filename: str) -> Dict[str, Any]:
     checksum = hashlib.sha256(file_content).hexdigest()
     try:
-        df = pd.read_csv(io.BytesIO(file_content))
+        df = _load_csv_dataframe(file_content)
     except Exception as e:
         return {
             "status": "invalid",
