@@ -33,21 +33,21 @@ export const Sidebar: React.FC = () => {
               key={item.to}
               to={item.to}
               className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium transition-all ${
+                `group flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium transition-all hover:-translate-y-px hover:shadow-sm ${
                   isActive
                     ? "bg-teal-50 text-teal-700 font-semibold shadow-xs border-l-4 border-teal-600"
-                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
+                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-50 hover:translate-x-0.5"
                 }`
               }
             >
-              <Icon className="w-4 h-4 shrink-0" />
+              <Icon className="w-4 h-4 shrink-0 transition-transform group-hover:scale-110 group-hover:-rotate-3" />
               <span>{item.label}</span>
             </NavLink>
           );
         })}
       </div>
 
-      <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-1.5 text-xs text-slate-600">
+      <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-1.5 text-xs text-slate-600 transition-all hover:-translate-y-0.5 hover:shadow-md">
         <div className="flex items-center gap-2 font-semibold text-slate-800">
           <Cpu className="w-4 h-4 text-teal-600" />
           <span>Model Registry</span>

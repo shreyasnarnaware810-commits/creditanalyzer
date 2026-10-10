@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../services/api";
 import { useAuth } from "../context/AuthContext";
-import mainBackground from "../assets/main-background.jpg";
 import {
   PlusCircle,
   Users,
@@ -49,16 +48,7 @@ export const OverviewDashboard: React.FC = () => {
   );
 
   return (
-    <div
-      className="relative -m-6 min-h-[calc(100vh-8rem)] overflow-hidden bg-[#0D263A] px-6 py-6"
-      style={{
-        backgroundImage: `url(${mainBackground})`,
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-      }}
-    >
-      <div className="absolute inset-0 bg-[#071C2F]/75" aria-hidden="true" />
-      <div className="relative z-10 space-y-6">
+    <div className="space-y-6">
       {/* Top Banner */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white border border-slate-200 p-6 rounded-2xl shadow-sm">
         <div>
@@ -214,7 +204,6 @@ export const OverviewDashboard: React.FC = () => {
             </table>
           </div>
         )}
-      </div>
       </div>
     </div>
   );
